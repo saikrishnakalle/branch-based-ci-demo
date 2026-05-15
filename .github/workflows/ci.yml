@@ -1,15 +1,12 @@
-name: Branch Based CI
+name: Branch CI
 
 on:
   workflow_dispatch:
     inputs:
-      target_branch:
-        description: "Select Branch"
+      branch:
+        description: "Branch to test"
         required: true
-        type: choice
-        options:
-          - hello-world
-          - math-app
+        default: "main"
 
 jobs:
   build:
@@ -19,29 +16,34 @@ jobs:
       - name: Checkout selected branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.target_branch }}
+          ref: ${{ github.event.inputs.branch }}
 
-      - name: Detect default files
+      - name: Detect branch defaults
         run: |
-          BRANCH="${{ github.event.inputs.target_branch }}"
+          BRANCH="${{ github.event.inputs.branch }}"
 
           if [ "$BRANCH" = "hello-world" ]; then
-            echo "PROGRAM=hello.py" >> $GITHUB_ENV
-            echo "TESTFILE=test_hello.py" >> $GITHUB_ENV
-
+            CODE="hello.py"
+            TEST="test_hello.py"
           elif [ "$BRANCH" = "math-app" ]; then
-            echo "PROGRAM=math_app.py" >> $GITHUB_ENV
-            echo "TESTFILE=test_math.py" >> $GITHUB_ENV
-
+            CODE="math_app.py"
+            TEST="test_math.py"
           else
-            echo "Unknown branch"
+            echo "Unknown branch: $BRANCH"
             exit 1
           fi
 
-      - name: Show selected files
+          echo "CODE=$CODE" >> $GITHUB_ENV
+          echo "TEST=$TEST" >> $GITHUB_ENV
+
+      - name: Summary
         run: |
-          echo "Program File: $PROGRAM"
-          echo "Test File: $TESTFILE"
+          echo "## Branch Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.event.inputs.branch }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Code File | $CODE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test File | $TEST |" >> $GITHUB_STEP_SUMMARY
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -51,8 +53,8 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
-      - name: Run Program
-        run: python $PROGRAM
+      - name: Run program
+        run: python $CODE
 
-      - name: Run Tests
-        run: pytest $TESTFILE -v
+      - name: Run tests
+        run: pytest $TEST -v --tb=short

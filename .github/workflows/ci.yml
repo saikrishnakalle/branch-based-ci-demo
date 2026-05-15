@@ -36,11 +36,9 @@ jobs:
           echo "CODE=$CODE" >> $GITHUB_ENV
           echo "TEST=$TEST" >> $GITHUB_ENV
 
-      - name: Summary
+      - name: Show Summary (GitHub UI)
         run: |
           echo "## Branch Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Branch | ${{ github.event.inputs.branch }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Code File | $CODE |" >> $GITHUB_STEP_SUMMARY
           echo "| Test File | $TEST |" >> $GITHUB_STEP_SUMMARY

@@ -4,13 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       target_branch:
-        description: "Select target branch"
+        description: "Select Branch"
         required: true
-        default: "hello-world"
         type: choice
         options:
           - hello-world
           - math-app
+
+      target_file:
+        description: "Select File"
+        required: true
+        type: choice
+        options:
+          - hello.py
+          - test_hello.py
+          - math_app.py
+          - test_math.py
 
 jobs:
   build:
@@ -22,6 +31,25 @@ jobs:
         with:
           ref: ${{ github.event.inputs.target_branch }}
 
+      - name: Validate file belongs to branch
+        run: |
+          BRANCH="${{ github.event.inputs.target_branch }}"
+          FILE="${{ github.event.inputs.target_file }}"
+
+          if [ "$BRANCH" = "hello-world" ]; then
+            if [[ "$FILE" != "hello.py" && "$FILE" != "test_hello.py" ]]; then
+              echo "Invalid file for hello-world branch"
+              exit 1
+            fi
+          fi
+
+          if [ "$BRANCH" = "math-app" ]; then
+            if [[ "$FILE" != "math_app.py" && "$FILE" != "test_math.py" ]]; then
+              echo "Invalid file for math-app branch"
+              exit 1
+            fi
+          fi
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -30,27 +58,5 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
-      - name: Detect branch files
-        run: |
-          BRANCH="${{ github.event.inputs.target_branch }}"
-
-          echo "Current branch: $BRANCH"
-
-          if [ "$BRANCH" = "hello-world" ]; then
-            echo "PROGRAM=hello.py" >> $GITHUB_ENV
-            echo "TESTFILE=test_hello.py" >> $GITHUB_ENV
-
-          elif [ "$BRANCH" = "math-app" ]; then
-            echo "PROGRAM=math_app.py" >> $GITHUB_ENV
-            echo "TESTFILE=test_math.py" >> $GITHUB_ENV
-
-          else
-            echo "Unknown branch"
-            exit 1
-          fi
-
-      - name: Run Program
-        run: python $PROGRAM
-
-      - name: Run Tests
-        run: pytest $TESTFILE -v
+      - name: Run selected file
+        run: python ${{ github.event.inputs.target_file }}

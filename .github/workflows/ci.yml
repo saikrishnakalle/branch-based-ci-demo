@@ -2,14 +2,25 @@ name: Branch Based CI
 
 on:
   workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Select target branch"
+        required: true
+        default: "hello-world"
+        type: choice
+        options:
+          - hello-world
+          - math-app
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout current branch
+      - name: Checkout selected branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_branch }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -21,16 +32,18 @@ jobs:
 
       - name: Detect branch files
         run: |
-          BRANCH=${GITHUB_REF#refs/heads/}
+          BRANCH="${{ github.event.inputs.target_branch }}"
 
           echo "Current branch: $BRANCH"
 
           if [ "$BRANCH" = "hello-world" ]; then
             echo "PROGRAM=hello.py" >> $GITHUB_ENV
             echo "TESTFILE=test_hello.py" >> $GITHUB_ENV
+
           elif [ "$BRANCH" = "math-app" ]; then
             echo "PROGRAM=math_app.py" >> $GITHUB_ENV
             echo "TESTFILE=test_math.py" >> $GITHUB_ENV
+
           else
             echo "Unknown branch"
             exit 1

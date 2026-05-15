@@ -1,0 +1,43 @@
+name: Branch Based CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Detect branch files
+        run: |
+          BRANCH=${GITHUB_REF#refs/heads/}
+
+          echo "Current branch: $BRANCH"
+
+          if [ "$BRANCH" = "hello-world" ]; then
+            echo "PROGRAM=hello.py" >> $GITHUB_ENV
+            echo "TESTFILE=test_hello.py" >> $GITHUB_ENV
+          elif [ "$BRANCH" = "math-app" ]; then
+            echo "PROGRAM=math_app.py" >> $GITHUB_ENV
+            echo "TESTFILE=test_math.py" >> $GITHUB_ENV
+          else
+            echo "Unknown branch"
+            exit 1
+          fi
+
+      - name: Run Program
+        run: python $PROGRAM
+
+      - name: Run Tests
+        run: pytest $TESTFILE -v

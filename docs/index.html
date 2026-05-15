@@ -1,62 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Branch File Explorer CI</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    padding: 20px;
+  }
+
+  .box {
+    max-width: 700px;
+    margin: auto;
+    background: #161b22;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #30363d;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    background: #0d1117;
+    color: white;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    background: #238636;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    background: gray;
+    cursor: not-allowed;
+  }
+
+  .file-list {
+    margin-top: 15px;
+    padding: 10px;
+    background: #0d1117;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+  }
+
+  .file {
+    padding: 5px;
+    border-bottom: 1px solid #222;
+    font-size: 13px;
+  }
+
+  .title {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #58a6ff;
+  }
+
+  .status {
+    margin-top: 10px;
+    font-size: 13px;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>CI Branch File Explorer</h2>
+
+<input id="token" type="password" placeholder="GitHub Token (ghp_...)" />
+
+<select id="branch">
+  <option value="">Select Branch</option>
+  <option value="main">main</option>
+  <option value="hello-world">hello-world</option>
+  <option value="math-app">math-app</option>
+</select>
+
+<button onclick="loadFiles()">Load Files</button>
+
+<div class="title">Files in Branch</div>
+<div class="file-list" id="files">No data</div>
+
+<div class="title">Select Code File</div>
+<select id="codeFile"></select>
+
+<div class="title">Select Test File</div>
+<select id="testFile"></select>
+
+<button onclick="runCI()">Run Workflow</button>
+
+<div class="status" id="status"></div>
+
+</div>
+
 <script>
-const OWNER = "saikrishnakalle";
-const REPO  = "branch-based-ci-demo";
-const WORKFLOW_FILE = "branch-ci.yml";
+const OWNER = "YOUR_USERNAME";
+const REPO = "YOUR_REPO";
+const WORKFLOW = "branch-ci.yml";
 
-let currentBranchFiles = [];
-
-document.getElementById("branch").addEventListener("change", loadBranchFiles);
-
-async function loadBranchFiles() {
+async function loadFiles() {
   const branch = document.getElementById("branch").value;
-  const preview = document.getElementById("preview");
+  const token = document.getElementById("token").value;
 
-  if (!branch) return;
+  const fileBox = document.getElementById("files");
+  const codeSel = document.getElementById("codeFile");
+  const testSel = document.getElementById("testFile");
 
-  preview.innerHTML = "Loading files...";
+  if (!branch) {
+    alert("Select branch");
+    return;
+  }
 
-  const res = await fetch(
-    `https://api.github.com/repos/${OWNER}/${REPO}/contents?ref=${branch}`
-  );
+  fileBox.innerHTML = "Loading...";
 
-  const files = await res.json();
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${OWNER}/${REPO}/contents?ref=${branch}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      }
+    );
 
-  // store files globally
-  currentBranchFiles = files.map(f => f.path);
+    const data = await res.json();
 
-  // filter python files
-  const codeFiles = currentBranchFiles.filter(f =>
-    f.endsWith(".py") && !f.startsWith("test_")
-  );
+    if (!Array.isArray(data)) {
+      fileBox.innerHTML = "Error loading files (check token / repo)";
+      return;
+    }
 
-  const testFiles = currentBranchFiles.filter(f =>
-    f.startsWith("test_") && f.endsWith(".py")
-  );
+    const files = data.map(f => f.path);
 
-  preview.innerHTML = `
-    <label>Code File</label>
-    <select id="codeSelect">
-      ${codeFiles.map(f => `<option value="${f}">${f}</option>`).join("")}
-    </select>
+    fileBox.innerHTML = files.map(f => `<div class="file">${f}</div>`).join("");
 
-    <label>Test File</label>
-    <select id="testSelect">
-      ${testFiles.map(f => `<option value="${f}">${f}</option>`).join("")}
-    </select>
-  `;
+    const codeFiles = files.filter(f => f.endsWith(".py") && !f.startsWith("test"));
+    const testFiles = files.filter(f => f.startsWith("test") && f.endsWith(".py"));
 
-  document.getElementById("runBtn").disabled = false;
+    codeSel.innerHTML = codeFiles.map(f => `<option value="${f}">${f}</option>`).join("");
+    testSel.innerHTML = testFiles.map(f => `<option value="${f}">${f}</option>`).join("");
+
+  } catch (e) {
+    fileBox.innerHTML = "Failed to load files";
+  }
 }
 
-async function runWorkflow() {
+async function runCI() {
   const token = document.getElementById("token").value;
   const branch = document.getElementById("branch").value;
+  const codeFile = document.getElementById("codeFile").value;
+  const testFile = document.getElementById("testFile").value;
 
-  const codeFile = document.getElementById("codeSelect").value;
-  const testFile = document.getElementById("testSelect").value;
+  const status = document.getElementById("status");
+
+  status.innerHTML = "Triggering workflow...";
 
   const res = await fetch(
-    `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+    `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
     {
       method: "POST",
       headers: {
@@ -67,7 +180,7 @@ async function runWorkflow() {
       body: JSON.stringify({
         ref: "main",
         inputs: {
-          branch: branch,
+          branch,
           program_file: codeFile,
           test_file: testFile
         }
@@ -75,6 +188,14 @@ async function runWorkflow() {
     }
   );
 
-  alert(res.status === 204 ? "Workflow triggered" : "Error triggering workflow");
+  if (res.status === 204) {
+    status.innerHTML = "Workflow triggered successfully ✅";
+  } else {
+    const err = await res.json().catch(()=>({}));
+    status.innerHTML = "Error: " + (err.message || res.status);
+  }
 }
 </script>
+
+</body>
+</html>

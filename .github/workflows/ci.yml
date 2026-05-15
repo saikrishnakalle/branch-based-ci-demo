@@ -3,6 +3,7 @@ name: Branch Based CI
 on:
   workflow_dispatch:
     inputs:
+
       target_branch:
         description: "Select Branch"
         required: true
@@ -11,14 +12,20 @@ on:
           - hello-world
           - math-app
 
-      target_file:
-        description: "Select File"
+      code_file:
+        description: "Select Code File"
         required: true
         type: choice
         options:
           - hello.py
-          - test_hello.py
           - math_app.py
+
+      test_file:
+        description: "Select Test File"
+        required: true
+        type: choice
+        options:
+          - test_hello.py
           - test_math.py
 
 jobs:
@@ -31,21 +38,26 @@ jobs:
         with:
           ref: ${{ github.event.inputs.target_branch }}
 
-      - name: Validate file belongs to branch
+      - name: Validate branch and files
         run: |
           BRANCH="${{ github.event.inputs.target_branch }}"
-          FILE="${{ github.event.inputs.target_file }}"
+          CODE="${{ github.event.inputs.code_file }}"
+          TEST="${{ github.event.inputs.test_file }}"
+
+          echo "Branch: $BRANCH"
+          echo "Code File: $CODE"
+          echo "Test File: $TEST"
 
           if [ "$BRANCH" = "hello-world" ]; then
-            if [[ "$FILE" != "hello.py" && "$FILE" != "test_hello.py" ]]; then
-              echo "Invalid file for hello-world branch"
+            if [ "$CODE" != "hello.py" ] || [ "$TEST" != "test_hello.py" ]; then
+              echo "Invalid files selected for hello-world branch"
               exit 1
             fi
           fi
 
           if [ "$BRANCH" = "math-app" ]; then
-            if [[ "$FILE" != "math_app.py" && "$FILE" != "test_math.py" ]]; then
-              echo "Invalid file for math-app branch"
+            if [ "$CODE" != "math_app.py" ] || [ "$TEST" != "test_math.py" ]; then
+              echo "Invalid files selected for math-app branch"
               exit 1
             fi
           fi
@@ -58,5 +70,8 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
-      - name: Run selected file
-        run: python ${{ github.event.inputs.target_file }}
+      - name: Run code file
+        run: python ${{ github.event.inputs.code_file }}
+
+      - name: Run test file
+        run: pytest ${{ github.event.inputs.test_file }} -v

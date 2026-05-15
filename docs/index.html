@@ -1,419 +1,80 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CI Dashboard</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<script>
+const OWNER = "YOUR_USERNAME";
+const REPO  = "YOUR_REPO";
+const WORKFLOW_FILE = "branch-ci.yml";
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f5;
-      color: #1a1a1a;
-      min-height: 100vh;
-      padding: 2rem 1rem;
-    }
+let currentBranchFiles = [];
 
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-    }
+document.getElementById("branch").addEventListener("change", loadBranchFiles);
 
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 0.25rem;
-    }
+async function loadBranchFiles() {
+  const branch = document.getElementById("branch").value;
+  const preview = document.getElementById("preview");
 
-    .subtitle {
-      font-size: 13px;
-      color: #666;
-      margin-bottom: 1.5rem;
-    }
+  if (!branch) return;
 
-    .card {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 1rem;
-    }
+  preview.innerHTML = "Loading files...";
 
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #444;
-      margin-bottom: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
+  const res = await fetch(
+    `https://api.github.com/repos/${OWNER}/${REPO}/contents?ref=${branch}`
+  );
 
-    label {
-      display: block;
-      font-size: 13px;
-      color: #555;
-      margin-bottom: 4px;
-    }
+  const files = await res.json();
 
-    input, select {
-      width: 100%;
-      padding: 9px 12px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      font-size: 14px;
-      margin-bottom: 1rem;
-      background: #fff;
-      color: #1a1a1a;
-    }
+  // store files globally
+  currentBranchFiles = files.map(f => f.path);
 
-    input:focus, select:focus {
-      outline: none;
-      border-color: #0969da;
-    }
+  // filter python files
+  const codeFiles = currentBranchFiles.filter(f =>
+    f.endsWith(".py") && !f.startsWith("test_")
+  );
 
-    .file-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: #f6f8fa;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      font-family: monospace;
-    }
+  const testFiles = currentBranchFiles.filter(f =>
+    f.startsWith("test_") && f.endsWith(".py")
+  );
 
-    .badge {
-      margin-left: auto;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-family: sans-serif;
-    }
-
-    .badge-code { background: #dbeafe; color: #1d4ed8; }
-    .badge-test { background: #dcfce7; color: #166534; }
-
-    .empty {
-      font-size: 13px;
-      color: #aaa;
-      text-align: center;
-      padding: 1rem 0;
-    }
-
-    .run-btn {
-      width: 100%;
-      padding: 11px;
-      background: #1a7f37;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 0.5rem;
-    }
-
-    .run-btn:hover { background: #166a2e; }
-    .run-btn:disabled { background: #ccc; cursor: not-allowed; }
-
-    /* Status badge */
-    .status-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 0.75rem;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .dot-pending  { background: #aaa; }
-    .dot-running  { background: #f59e0b; animation: pulse 1s infinite; }
-    .dot-success  { background: #22c55e; }
-    .dot-failure  { background: #ef4444; }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    .status-text {
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .status-meta {
-      font-size: 12px;
-      color: #888;
-      margin-left: auto;
-    }
-
-    /* Steps list */
-    .step-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 13px;
-    }
-
-    .step-row:last-child { border-bottom: none; }
-
-    .step-icon { font-size: 15px; width: 20px; text-align: center; }
-    .step-name { flex: 1; }
-    .step-duration { font-size: 12px; color: #888; }
-
-    .gh-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: #0969da;
-      text-decoration: none;
-      margin-top: 0.75rem;
-    }
-
-    .gh-link:hover { text-decoration: underline; }
-
-    .hint {
-      font-size: 12px;
-      color: #888;
-      text-align: center;
-      margin-top: 8px;
-    }
-  </style>
-</head>
-<body>
-<div class="container">
-
-  <h1>CI Dashboard</h1>
-  <p class="subtitle">Select a branch to preview its files and trigger a workflow run</p>
-
-  <!-- Config card -->
-  <div class="card">
-    <div class="card-title">Configuration</div>
-
-    <label>GitHub Token (PAT)</label>
-    <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" />
-
-    <label>Select branch</label>
-    <select id="branch" onchange="onBranchChange()">
-      <option value="">— choose a branch —</option>
-      <option value="hello-world">hello-world</option>
-      <option value="math-app">math-app</option>
+  preview.innerHTML = `
+    <label>Code File</label>
+    <select id="codeSelect">
+      ${codeFiles.map(f => `<option value="${f}">${f}</option>`).join("")}
     </select>
 
-    <div class="card-title" style="margin-bottom:0.5rem;">Default files</div>
-    <div id="file-preview">
-      <div class="empty">Select a branch to see its files</div>
-    </div>
+    <label>Test File</label>
+    <select id="testSelect">
+      ${testFiles.map(f => `<option value="${f}">${f}</option>`).join("")}
+    </select>
+  `;
 
-    <button class="run-btn" id="run-btn" disabled onclick="triggerRun()">
-      Run Workflow
-    </button>
-    <div class="hint" id="hint">Choose a branch first</div>
-  </div>
+  document.getElementById("runBtn").disabled = false;
+}
 
-  <!-- Results card -->
-  <div class="card" id="results-card" style="display:none;">
-    <div class="card-title">Run Results</div>
+async function runWorkflow() {
+  const token = document.getElementById("token").value;
+  const branch = document.getElementById("branch").value;
 
-    <div class="status-row">
-      <div class="status-dot" id="status-dot"></div>
-      <span class="status-text" id="status-text">—</span>
-      <span class="status-meta" id="status-meta"></span>
-    </div>
+  const codeFile = document.getElementById("codeSelect").value;
+  const testFile = document.getElementById("testSelect").value;
 
-    <div id="steps-list"></div>
-
-    <a class="gh-link" id="gh-link" href="#" target="_blank">
-      ↗ View full logs on GitHub
-    </a>
-  </div>
-
-</div>
-
-<script>
-  const OWNER = "YOUR_USERNAME";
-  const REPO  = "YOUR_REPO";
-  const WORKFLOW = "ci.yml";
-
-  const defaults = {
-    "hello-world": { code: "hello.py",    test: "test_hello.py"  },
-    "math-app":    { code: "math_app.py", test: "test_math.py"   },
-  };
-
-  let pollTimer = null;
-
-  function onBranchChange() {
-    const branch = document.getElementById("branch").value;
-    const preview = document.getElementById("file-preview");
-    const btn = document.getElementById("run-btn");
-    const hint = document.getElementById("hint");
-
-    if (!branch || !defaults[branch]) {
-      preview.innerHTML = '<div class="empty">Select a branch to see its files</div>';
-      btn.disabled = true;
-      hint.textContent = "Choose a branch first";
-      return;
+  const res = await fetch(
+    `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ref: "main",
+        inputs: {
+          branch: branch,
+          program_file: codeFile,
+          test_file: testFile
+        }
+      })
     }
+  );
 
-    const d = defaults[branch];
-    preview.innerHTML = `
-      <div class="file-box">
-        🐍 ${d.code}
-        <span class="badge badge-code">code</span>
-      </div>
-      <div class="file-box">
-        🧪 ${d.test}
-        <span class="badge badge-test">test</span>
-      </div>
-    `;
-    btn.disabled = false;
-    hint.textContent = "These files will run automatically";
-  }
-
-  async function triggerRun() {
-    const token  = document.getElementById("token").value.trim();
-    const branch = document.getElementById("branch").value;
-    const btn    = document.getElementById("run-btn");
-    const hint   = document.getElementById("hint");
-
-    if (!token) { alert("Please enter your GitHub token."); return; }
-    if (!branch) { alert("Please select a branch."); return; }
-
-    btn.disabled = true;
-    btn.textContent = "Triggering...";
-    hint.textContent = "Sending to GitHub Actions...";
-
-    const res = await fetch(
-      `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ref: "main",
-          inputs: { branch: branch }
-        }),
-      }
-    );
-
-    if (res.status === 204) {
-      btn.textContent = "Triggered!";
-      hint.textContent = "Workflow started — fetching results...";
-      document.getElementById("results-card").style.display = "block";
-      showStatus("running", "Running...", "");
-      setTimeout(() => pollResults(token), 4000);
-    } else {
-      const err = await res.json();
-      alert("Error: " + (err.message || res.status));
-      btn.disabled = false;
-      btn.textContent = "Run Workflow";
-    }
-  }
-
-  async function pollResults(token) {
-    clearTimeout(pollTimer);
-
-    const res = await fetch(
-      `https://api.github.com/repos/${OWNER}/${REPO}/actions/runs?per_page=5`,
-      { headers: { "Authorization": `Bearer ${token}` } }
-    );
-
-    const data = await res.json();
-    const run = data.workflow_runs?.find(r => r.name === "Branch CI");
-
-    if (!run) {
-      pollTimer = setTimeout(() => pollResults(token), 4000);
-      return;
-    }
-
-    const status     = run.status;
-    const conclusion = run.conclusion;
-    const runUrl     = run.html_url;
-    const branch     = document.getElementById("branch").value;
-
-    document.getElementById("gh-link").href = runUrl;
-
-    if (status === "completed") {
-      const label = conclusion === "success" ? "All tests passed" : "Tests failed";
-      showStatus(conclusion, label, formatTime(run.updated_at));
-      await fetchSteps(token, run.id);
-
-      // re-enable button
-      const btn = document.getElementById("run-btn");
-      btn.disabled = false;
-      btn.textContent = "Run Workflow";
-      document.getElementById("hint").textContent = "Run again anytime";
-    } else {
-      showStatus("running", "Running...", "");
-      await fetchSteps(token, run.id);
-      pollTimer = setTimeout(() => pollResults(token), 4000);
-    }
-  }
-
-  async function fetchSteps(token, runId) {
-    const res = await fetch(
-      `https://api.github.com/repos/${OWNER}/${REPO}/actions/runs/${runId}/jobs`,
-      { headers: { "Authorization": `Bearer ${token}` } }
-    );
-
-    const data = await res.json();
-    const job  = data.jobs?.[0];
-    if (!job) return;
-
-    const steps = job.steps || [];
-    const list  = document.getElementById("steps-list");
-
-    list.innerHTML = steps.map(step => {
-      const icon =
-        step.conclusion === "success"  ? "✅" :
-        step.conclusion === "failure"  ? "❌" :
-        step.conclusion === "skipped"  ? "⏭️" :
-        step.status     === "in_progress" ? "⏳" : "⬜";
-
-      const dur = step.started_at && step.completed_at
-        ? `${Math.round((new Date(step.completed_at) - new Date(step.started_at)) / 1000)}s`
-        : "";
-
-      return `
-        <div class="step-row">
-          <span class="step-icon">${icon}</span>
-          <span class="step-name">${step.name}</span>
-          <span class="step-duration">${dur}</span>
-        </div>
-      `;
-    }).join("");
-  }
-
-  function showStatus(state, text, meta) {
-    const dot  = document.getElementById("status-dot");
-    const txt  = document.getElementById("status-text");
-    const m    = document.getElementById("status-meta");
-
-    dot.className = "status-dot";
-    if (state === "running") dot.classList.add("dot-running");
-    else if (state === "success") dot.classList.add("dot-success");
-    else dot.classList.add("dot-failure");
-
-    txt.textContent  = text;
-    m.textContent    = meta;
-  }
-
-  function formatTime(iso) {
-    return new Date(iso).toLocaleTimeString();
-  }
+  alert(res.status === 204 ? "Workflow triggered" : "Error triggering workflow");
+}
 </script>
-</body>
-</html>
